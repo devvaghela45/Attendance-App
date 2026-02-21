@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYER
+  EMPLOYEE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+model Users {
+  id              String    @id @default(cuid())
+  role            Role
+  fullName        String
+  email           String?   @unique
+  mobile          String    @unique
+  passwordHash    String
+  otpVerified     Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  companyId       String?
+  employeeId      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  companyOwned    Companies? @relation("CompanyOwner")
+  company         Companies? @relation("CompanyMembers", fields: [companyId], references: [id])
+  employeeProfile Employees? @relation(fields: [employeeId], references: [id])
+
+  @@index([companyId])
+}
+
+model Companies {
+  id               String      @id @default(cuid())
+  name             String
+  address          String
+  gstNumber        String?
+  companyCode      String      @unique
+  inviteToken      String      @unique
+  joiningCode      String      @unique
+  ownerId          String      @unique
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  owner            Users       @relation("CompanyOwner", fields: [ownerId], references: [id])
+  members          Users[]     @relation("CompanyMembers")
+  employees        Employees[]
+}
+
+model Employees {
+  id                    String       @id @default(cuid())
+  companyId             String
+  fullName              String
+  mobile                String
+  dateOfBirth           DateTime
+  encryptedUanNumber    String
+  encryptedBankAccount  String
+  encryptedIfscCode     String
+  email                 String?
+  approvalStatus        Boolean      @default(false)
+  createdByEmployerId   String
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  company               Companies    @relation(fields: [companyId], references: [id])
+  userAccount           Users[]
+  attendanceRecords     Attendance[]
+  overtimeRecords       Overtime[]
+
+  @@index([companyId])
+  @@unique([companyId, mobile])
+}
+
+model Attendance {
+  id               String            @id @default(cuid())
+  companyId        String
+  employeeId       String
+  date             DateTime
+  status           AttendanceStatus
+  markedByUserId   String
+  createdAt        DateTime          @default(now())
+
+  employee         Employees         @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date])
+  @@index([companyId, date])
+}
+
+model Overtime {
+  id               String    @id @default(cuid())
+  companyId        String
+  employeeId       String
+  date             DateTime
+  hours            Decimal   @db.Decimal(5, 2)
+  createdByUserId  String
+  createdAt        DateTime  @default(now())
+
+  employee         Employees @relation(fields: [employeeId], references: [id])
+
+  @@index([companyId, date])
+  @@unique([employeeId, date])
+}
